@@ -1,0 +1,44 @@
+import java.net.Socket;
+import java.net.UnknownHostException;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.BufferedWriter;
+import java.io.OutputStreamWriter;
+/**
+ * Tcp client class
+ * @author Nicola Pedretti
+ *
+ */
+public class TcpMapClient {
+	
+	private static boolean stopClient = false; 
+	
+	/**
+	 *takes in the name of the host as the first argument and the connecting port (optional)
+	 *reads and writes to the server until a blank like is entered by the user.
+	 * @throws IOException 
+	 * @throws UnknownHostException 
+	*/
+	public static void main(String[] args) throws UnknownHostException, IOException{
+		String hostname = args[0];
+		int portNumber = args.length > 1 ? Integer.parseInt(args[1]) : 31357;
+		Socket socket = new Socket(hostname,portNumber);
+		BufferedWriter output = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(),"US-ASCII"));
+		BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream(),"US-ASCII"));
+		BufferedReader clientCommand = new BufferedReader(new InputStreamReader(System.in));
+		while(!stopClient){
+		  System.out.printl("Insert Input >>");
+			String command = clientCommand.readLine();
+			if(command.equals("")){
+				socket.close();
+				stopClient = true;
+				break;
+			}
+			output.write(command);output.newLine();output.flush();	
+			System.out.println(input.readLine());
+		}
+	}
+
+
+}
