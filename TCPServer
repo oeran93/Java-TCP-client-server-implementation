@@ -1,0 +1,196 @@
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.HashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ *Tcp server class
+ * @author Nicola Pedretti
+ *
+ */
+public class TcpMapServer {
+
+	HashMap<String, String>	database	= new HashMap<String, String>();
+
+	/**
+	 * takes in two optional arguments, socketIP and port. creates a new
+	 * instance of this class passing in socketIP and port
+	 */
+	public static void main(String[] args) {
+		try {
+			int port = args.length > 1 ? Integer.parseInt(args[1]) : 31357;
+			InetAddress address = args.length == 0 ? null : InetAddress
+					.getByName(args[0]);
+			while (true) {
+				@SuppressWarnings("unused")
+				TcpMapServer server = new TcpMapServer(address, port);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+	}
+
+	/**
+	 * Waits for a host to connect and then processes the input.
+	 * sends back the results.
+	 * @param socktIP String local ip to bind on
+	 * @param port
+	 * @throws IOException
+	 */
+	public TcpMapServer(InetAddress address, int port) throws IOException {
+		while (true) {
+			ServerSocket listenSock = new ServerSocket(port, 0, address);
+			Socket guest = listenSock.accept();
+			BufferedWriter output = new BufferedWriter(new OutputStreamWriter(
+					guest.getOutputStream(), "US-ASCII"));
+			BufferedReader input = new BufferedReader(new InputStreamReader(
+					guest.getInputStream(), "US-ASCII"));
+			while (true) {
+				String command = input.readLine();
+				if (command == null)
+					break;
+				HashMap<String, String> parsedInput = parseInput(command);
+				String result;
+				if (parsedInput == null) {
+					result = "error: unrecognizable input:" + command;
+				} else {
+					result = action(parsedInput);
+				}
+				output.write(result);
+				output.newLine();
+				output.flush();
+			}
+			listenSock.close();
+		}
+	}
+
+	/**
+	 * Parses the input arrived from the client
+	 * @param input String input coming from the client
+	 * @return String[] array with command and all the given values
+	 * 	 		null if the inputs was not conform to the protocol.
+	 */
+	public HashMap<String, String> parseInput(String input) {
+		HashMap<String, String> parsedInput = new HashMap<String, String>();
+		String[] regExs = { "(?<command>get all)",
+				"(?<command>(get|remove)):(?<value>[^:]+)",
+				"(?<command>(put|swap)):(?<value>[^:]+):(?<value2>[^:]+)" };
+		for (String regex : regExs) {
+			Pattern pattern = Pattern.compile(regex);
+			Matcher match = pattern.matcher(input);
+			if (match.matches()) {
+				try {
+					parsedInput.put("command", match.group("command").trim());
+					parsedInput.put("value", match.group("value").trim());
+					parsedInput.put("value2", match.group("value2").trim());
+				} catch (IllegalArgumentException notAGroup) {
+					return parsedInput;
+				}
+				return parsedInput;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * acts according to the client input (removes,swaps,puts etc )
+	 * @param input HasMap<String,String> the input from the host
+	 * @return String result of completing the action
+	 */
+	public String action(HashMap<String, String> input) {
+		String result = "";
+		String cmd = input.get("command");
+		switch (cmd) {
+			case "get":
+				return get(input.get("value"));
+			case "remove":
+				return remove(input.get("value"));
+			case "swap":
+				return swap(input.get("value"), input.get("value2"));
+			case "put":
+				return put(input.get("value"), input.get("value2"));
+			case "get all":
+				return getAll();
+		}
+		return result;
+	}
+
+	/**
+	 * Gets the requested value from the database
+	 * @param k String key we want to know the value of
+	 * @return String success:<result> or no match if not found
+	 */
+	public String get(String k) {
+		String result = database.get(k);
+		String response = result == null ? "no match" : "success:" + result;
+		return response;
+	}
+
+	/**
+	 * Inserts a new key-value pair in the database
+	 * @param k String key
+	 * @param v String value
+	 * @return String updated:<key inserted>
+	 */
+	public String put(String k, String v) {
+		database.put(k, v);
+		return "success";
+	}
+
+	/**
+	 * Swaps the value of the keys
+	 * @param k1 String first key
+	 * @param k2 String second key
+	 * @return String success or no match
+	 */
+	public String swap(String k1, String k2) {
+		String v1 = database.get(k1);
+		String v2 = database.get(k2);
+		if (v1 == null || v2 == null) {
+			return "no match";
+		}
+		database.put(k1, v2);
+		database.put(k2, v1);
+		return "success";
+	}
+
+	/**
+	 * removes a key-value pair from the database
+	 * @param k String key to be removed
+	 * @return String success or no match
+	 */
+	public String remove(String k) {
+		if (database.remove(k) == null) {
+			return "no match";
+		}
+		return "success";
+	}
+
+	/**
+	 * retrieves all the elements in the db
+	 * @return String a string with all the elements in the db in the form key::value key::value
+	 */
+	public String getAll() {
+		StringBuilder sb = new StringBuilder();
+		for (String key : database.keySet()) {
+			sb.append("key:" + key + "::" + database.get(key) + " ");
+		}
+		return sb.toString();
+	}
+
+	/**
+	 * return the database datastructure
+	 * @return HashMap<String,String> database
+	 */
+	public HashMap<String, String> getDatabase() {
+		return database;
+	}
+}
